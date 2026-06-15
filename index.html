@@ -1,0 +1,962 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Interactive Cat Pet App 🐱</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* =============================================
+       BACKGROUND & LAYOUT
+    ============================================= */
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 25%, #f093fb 50%, #f5576c 75%, #fda085 100%);
+      background-size: 400% 400%;
+      animation: bgShift 12s ease infinite;
+      font-family: 'Segoe UI', system-ui, sans-serif;
+    }
+
+    @keyframes bgShift {
+      0%   { background-position: 0% 50%; }
+      50%  { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    /* =============================================
+       DECORATIVE BLOBS
+    ============================================= */
+    .blob {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(60px);
+      opacity: 0.35;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .blob-1 {
+      width: 400px; height: 400px;
+      background: radial-gradient(circle, #a78bfa, #7c3aed);
+      top: -80px; left: -80px;
+      animation: blobFloat1 8s ease-in-out infinite;
+    }
+    .blob-2 {
+      width: 350px; height: 350px;
+      background: radial-gradient(circle, #f9a8d4, #ec4899);
+      bottom: -60px; right: -60px;
+      animation: blobFloat2 10s ease-in-out infinite;
+    }
+    @keyframes blobFloat1 {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      50%       { transform: translate(30px, 20px) scale(1.1); }
+    }
+    @keyframes blobFloat2 {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      50%       { transform: translate(-20px, -30px) scale(1.08); }
+    }
+
+    /* =============================================
+       GLASSMORPHISM PANEL
+    ============================================= */
+    .glass-panel {
+      position: relative;
+      z-index: 1;
+      background: rgba(255, 255, 255, 0.18);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      border: 1px solid rgba(255, 255, 255, 0.28);
+      border-radius: 2rem;
+      padding: 2.5rem 2rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 1.5rem;
+      width: min(400px, 92vw);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+    }
+
+    /* =============================================
+       MUTE BUTTON
+    ============================================= */
+    #mute-btn {
+      position: absolute;
+      top: 1rem; right: 1rem;
+      background: rgba(255, 255, 255, 0.25);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      border-radius: 0.75rem;
+      padding: 0.4rem 0.7rem;
+      font-size: 1.25rem;
+      cursor: pointer;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      transition: background 0.2s, transform 0.15s;
+      line-height: 1;
+      display: flex; align-items: center; gap: 0.3rem;
+    }
+    #mute-btn:hover { background: rgba(255,255,255,0.38); transform: scale(1.08); }
+    #mute-btn:active { transform: scale(0.95); }
+
+    /* =============================================
+       CAT STAGE
+    ============================================= */
+    #cat-stage {
+      position: relative;
+      width: 220px;
+      height: 220px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* =============================================
+       CAT SVG
+    ============================================= */
+    #cat {
+      cursor: pointer;
+      user-select: none;
+      -webkit-user-select: none;
+      outline: none;
+      filter: drop-shadow(0 4px 16px rgba(120,80,200,0.25));
+      transition: filter 0.2s;
+    }
+    #cat:focus-visible {
+      filter: drop-shadow(0 0 0 3px #a78bfa) drop-shadow(0 4px 16px rgba(120,80,200,0.35));
+      outline: 3px solid #a78bfa;
+      outline-offset: 6px;
+      border-radius: 50%;
+    }
+
+    /* =============================================
+       CAT ANIMATIONS
+    ============================================= */
+    /* Idle — gentle float + breathe */
+    @keyframes catIdle {
+      0%   { transform: translateY(0px) scale(1); }
+      25%  { transform: translateY(-6px) scale(1.02); }
+      50%  { transform: translateY(-10px) scale(1.03); }
+      75%  { transform: translateY(-6px) scale(1.02); }
+      100% { transform: translateY(0px) scale(1); }
+    }
+    .cat--idle { animation: catIdle 2500ms ease-in-out infinite; }
+
+    /* Bounce — immediate scale pop on every click */
+    @keyframes catBounce {
+      0%   { transform: scale(1); }
+      40%  { transform: scale(1.22); }
+      70%  { transform: scale(0.9); }
+      100% { transform: scale(1); }
+    }
+    .cat--bounce { animation: catBounce 250ms ease-out forwards; }
+
+    /* Purr — gentle side-to-side shake */
+    @keyframes catPurr {
+      0%,100% { transform: rotate(0deg) scale(1.05); }
+      20%  { transform: rotate(-4deg) scale(1.08); }
+      40%  { transform: rotate(4deg) scale(1.08); }
+      60%  { transform: rotate(-3deg) scale(1.06); }
+      80%  { transform: rotate(3deg) scale(1.06); }
+    }
+    .cat--purr { animation: catPurr 1200ms ease forwards; }
+
+    /* Head tilt */
+    @keyframes catHeadTilt {
+      0%   { transform: rotate(0deg); }
+      30%  { transform: rotate(-18deg) scale(1.05); }
+      60%  { transform: rotate(-18deg) scale(1.05); }
+      85%  { transform: rotate(3deg); }
+      100% { transform: rotate(0deg); }
+    }
+    .cat--head-tilt { animation: catHeadTilt 1000ms ease forwards; }
+
+    /* Blink — quick squish */
+    @keyframes catBlink {
+      0%   { transform: scaleY(1); }
+      30%  { transform: scaleY(0.4) scaleX(1.15); }
+      60%  { transform: scaleY(0.4) scaleX(1.15); }
+      100% { transform: scaleY(1); }
+    }
+    .cat--blink { animation: catBlink 800ms ease forwards; }
+
+    /* Stretch */
+    @keyframes catStretch {
+      0%   { transform: scale(1); }
+      25%  { transform: scaleX(1.3) scaleY(0.75) translateY(8px); }
+      55%  { transform: scaleX(0.82) scaleY(1.35) translateY(-8px); }
+      80%  { transform: scaleX(1.1) scaleY(0.95); }
+      100% { transform: scale(1); }
+    }
+    .cat--stretch { animation: catStretch 1500ms ease-in-out forwards; }
+
+    /* Spin */
+    @keyframes catSpin {
+      0%   { transform: rotate(0deg) scale(1); }
+      50%  { transform: rotate(180deg) scale(1.12); }
+      100% { transform: rotate(360deg) scale(1); }
+    }
+    .cat--spin { animation: catSpin 1000ms linear forwards; }
+
+    /* Heart eyes — happy pulse */
+    @keyframes catHeartEyes {
+      0%,100% { transform: scale(1); filter: hue-rotate(0deg); }
+      25%  { transform: scale(1.18); filter: hue-rotate(20deg); }
+      50%  { transform: scale(1.05); filter: hue-rotate(10deg); }
+      75%  { transform: scale(1.18); filter: hue-rotate(20deg); }
+    }
+    .cat--heart-eyes { animation: catHeartEyes 1200ms ease forwards; }
+
+    /* Sleepy — slow droop */
+    @keyframes catSleepy {
+      0%   { transform: rotate(0deg) translateY(0); opacity: 1; }
+      40%  { transform: rotate(-8deg) translateY(5px); opacity: 0.8; }
+      70%  { transform: rotate(-8deg) translateY(8px); opacity: 0.7; }
+      85%  { transform: rotate(-4deg) translateY(4px); opacity: 0.9; }
+      100% { transform: rotate(0deg) translateY(0); opacity: 1; }
+    }
+    .cat--sleepy { animation: catSleepy 1400ms ease forwards; }
+
+    /* Celebrate — big flashy bounce + spin */
+    @keyframes catCelebrate {
+      0%   { transform: scale(1) rotate(0deg); filter: hue-rotate(0deg); }
+      15%  { transform: scale(1.35) rotate(-10deg); filter: hue-rotate(30deg); }
+      30%  { transform: scale(1.2) rotate(10deg); filter: hue-rotate(60deg); }
+      45%  { transform: scale(1.4) rotate(-8deg); filter: hue-rotate(100deg); }
+      60%  { transform: scale(1.2) rotate(8deg); filter: hue-rotate(150deg); }
+      75%  { transform: scale(1.3) rotate(-5deg); filter: hue-rotate(200deg); }
+      90%  { transform: scale(1.05) rotate(2deg); filter: hue-rotate(250deg); }
+      100% { transform: scale(1) rotate(0deg); filter: hue-rotate(0deg); }
+    }
+    .cat--celebrate { animation: catCelebrate 2000ms ease forwards; }
+
+    /* =============================================
+       FLOATING LABELS / PARTICLES
+    ============================================= */
+    @keyframes floatUp {
+      0%   { transform: translateY(0px) scale(1);   opacity: 1; }
+      60%  { transform: translateY(-55px) scale(1.15); opacity: 0.9; }
+      100% { transform: translateY(-100px) scale(0.8); opacity: 0; }
+    }
+    .floating-label {
+      position: absolute;
+      pointer-events: none;
+      font-size: 1.6rem;
+      line-height: 1;
+      z-index: 20;
+      animation: floatUp 1000ms ease-out forwards;
+      transform-origin: center;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    /* =============================================
+       HAPPINESS METER
+    ============================================= */
+    #happiness-meter {
+      width: 100%;
+    }
+    .meter-label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 0.5rem;
+      color: rgba(255,255,255,0.92);
+      font-weight: 600;
+      font-size: 0.85rem;
+      letter-spacing: 0.03em;
+    }
+    .progress-track {
+      width: 100%;
+      height: 14px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 999px;
+      overflow: hidden;
+      border: 1px solid rgba(255,255,255,0.25);
+    }
+    #progress-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #a78bfa, #ec4899, #fbbf24);
+      border-radius: 999px;
+      transition: width 200ms ease;
+    }
+
+    /* =============================================
+       PET COUNTER
+    ============================================= */
+    #pet-counter {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      color: rgba(255,255,255,0.9);
+      font-size: 0.95rem;
+      font-weight: 600;
+      background: rgba(255,255,255,0.15);
+      border: 1px solid rgba(255,255,255,0.25);
+      border-radius: 999px;
+      padding: 0.4rem 1.1rem;
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      letter-spacing: 0.02em;
+    }
+    #pet-count {
+      color: #fde68a;
+      font-weight: 800;
+      font-size: 1.1rem;
+      min-width: 2ch;
+      text-align: right;
+    }
+
+    /* =============================================
+       APP TITLE
+    ============================================= */
+    .app-title {
+      color: rgba(255,255,255,0.95);
+      font-size: 1.25rem;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-align: center;
+      text-shadow: 0 2px 8px rgba(0,0,0,0.2);
+    }
+
+    /* =============================================
+       CELEBRATION FLASH OVERLAY
+    ============================================= */
+    #celebrate-flash {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background: radial-gradient(ellipse at center, rgba(255,223,100,0.35) 0%, transparent 70%);
+      opacity: 0;
+      z-index: 50;
+      transition: opacity 0.1s;
+    }
+    #celebrate-flash.active { opacity: 1; }
+
+    /* =============================================
+       REDUCE MOTION
+    ============================================= */
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <!-- Decorative blobs -->
+  <div class="blob blob-1" aria-hidden="true"></div>
+  <div class="blob blob-2" aria-hidden="true"></div>
+
+  <!-- Celebration flash overlay -->
+  <div id="celebrate-flash" aria-hidden="true"></div>
+
+  <!-- Main glass panel -->
+  <main class="glass-panel" role="main">
+    <!-- Mute button -->
+    <button
+      id="mute-btn"
+      aria-label="Toggle sound"
+      aria-pressed="false"
+      title="Toggle sound"
+    >🔊</button>
+
+    <!-- App title -->
+    <h1 class="app-title">🐾 Pet the Cat!</h1>
+
+    <!-- Cat stage -->
+    <div id="cat-stage" aria-live="polite" aria-atomic="false">
+      <!-- Cat SVG — ≤ 20 visual elements -->
+      <svg
+        id="cat"
+        role="button"
+        tabindex="0"
+        aria-label="Pet the cat"
+        width="180"
+        height="180"
+        viewBox="0 0 180 180"
+        xmlns="http://www.w3.org/2000/svg"
+        class="cat--idle"
+        focusable="true"
+      >
+        <!-- 1. Body -->
+        <ellipse cx="90" cy="115" rx="52" ry="44" fill="#f3c9a0" />
+        <!-- 2. Head -->
+        <circle cx="90" cy="72" r="44" fill="#f3c9a0" />
+        <!-- 3. Left ear outer -->
+        <polygon points="52,40 38,10 68,32" fill="#f3c9a0" />
+        <!-- 4. Right ear outer -->
+        <polygon points="128,40 142,10 112,32" fill="#f3c9a0" />
+        <!-- 5. Left ear inner -->
+        <polygon points="52,38 42,16 65,33" fill="#f9a8d4" />
+        <!-- 6. Right ear inner -->
+        <polygon points="128,38 138,16 115,33" fill="#f9a8d4" />
+        <!-- 7. Left eye white -->
+        <ellipse cx="74" cy="70" rx="11" ry="12" fill="white" />
+        <!-- 8. Right eye white -->
+        <ellipse cx="106" cy="70" rx="11" ry="12" fill="white" />
+        <!-- 9. Left pupil -->
+        <ellipse id="left-pupil" cx="75" cy="71" rx="6" ry="8" fill="#3b1f0f" />
+        <!-- 10. Right pupil -->
+        <ellipse id="right-pupil" cx="107" cy="71" rx="6" ry="8" fill="#3b1f0f" />
+        <!-- 11. Left eye shine -->
+        <circle cx="78" cy="67" r="2.5" fill="white" />
+        <!-- 12. Right eye shine -->
+        <circle cx="110" cy="67" r="2.5" fill="white" />
+        <!-- 13. Nose -->
+        <polygon points="90,84 86,80 94,80" fill="#e879b0" />
+        <!-- 14. Mouth left -->
+        <path d="M86,84 Q82,90 78,88" stroke="#c05b8a" stroke-width="1.8" fill="none" stroke-linecap="round" />
+        <!-- 15. Mouth right -->
+        <path d="M94,84 Q98,90 102,88" stroke="#c05b8a" stroke-width="1.8" fill="none" stroke-linecap="round" />
+        <!-- 16. Left whisker top -->
+        <line x1="60" y1="80" x2="82" y2="84" stroke="#a0785a" stroke-width="1.5" stroke-linecap="round" />
+        <!-- 17. Left whisker bottom -->
+        <line x1="60" y1="88" x2="82" y2="86" stroke="#a0785a" stroke-width="1.5" stroke-linecap="round" />
+        <!-- 18. Right whisker top -->
+        <line x1="120" y1="80" x2="98" y2="84" stroke="#a0785a" stroke-width="1.5" stroke-linecap="round" />
+        <!-- 19. Right whisker bottom -->
+        <line x1="120" y1="88" x2="98" y2="86" stroke="#a0785a" stroke-width="1.5" stroke-linecap="round" />
+        <!-- 20. Tail -->
+        <path d="M138,130 Q175,100 160,145 Q148,165 138,150" stroke="#e8b57a" stroke-width="10" fill="none" stroke-linecap="round" />
+      </svg>
+      <!-- Floating labels are injected here dynamically -->
+    </div>
+
+    <!-- Happiness Meter -->
+    <div id="happiness-meter" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100" aria-label="Happiness meter">
+      <div class="meter-label">
+        <span>😊 Happiness</span>
+        <span id="happiness-value" aria-live="polite">0</span><span style="color:rgba(255,255,255,0.7);font-weight:500">/100</span>
+      </div>
+      <div class="progress-track">
+        <div id="progress-bar"></div>
+      </div>
+    </div>
+
+    <!-- Pet Counter -->
+    <div id="pet-counter" aria-label="Pet counter">
+      🐾 Pets: <span id="pet-count" aria-live="polite" aria-atomic="true">0</span>
+    </div>
+  </main>
+
+  <script>
+  /* ============================================================
+     INTERACTIVE CAT PET APP
+     Single-file SPA — Vanilla JS ES2020+
+  ============================================================ */
+
+  'use strict';
+
+  /* ============================================================
+     REACTION POOL (static, defined at startup)
+  ============================================================ */
+  const reactionPool = [
+    { id: 'purr',      label: '😸', emoji: '💕', cssClass: 'cat--purr',       durationMs: 1200, soundId: 'purr'      },
+    { id: 'headTilt',  label: '🤔', emoji: '✨', cssClass: 'cat--head-tilt',   durationMs: 1000, soundId: 'tilt'      },
+    { id: 'blink',     label: '😌', emoji: '💫', cssClass: 'cat--blink',       durationMs: 800,  soundId: 'blink'     },
+    { id: 'stretch',   label: '😺', emoji: '⭐', cssClass: 'cat--stretch',     durationMs: 1500, soundId: 'stretch'   },
+    { id: 'spin',      label: '😵', emoji: '🌀', cssClass: 'cat--spin',        durationMs: 1000, soundId: 'spin'      },
+    { id: 'heartEyes', label: '😍', emoji: '❤️', cssClass: 'cat--heart-eyes',  durationMs: 1200, soundId: 'heartEyes' },
+    { id: 'sleepy',    label: '😴', emoji: '💤', cssClass: 'cat--sleepy',      durationMs: 1400, soundId: 'sleepy'    },
+  ];
+
+  const celebrationReaction = {
+    id: 'celebrate', label: '🎉', emoji: '🌟',
+    cssClass: 'cat--celebrate', durationMs: 2000, soundId: 'celebrate',
+  };
+
+  // All reaction CSS classes (for cleanup)
+  const ALL_CAT_REACTION_CLASSES = [
+    'cat--purr', 'cat--head-tilt', 'cat--blink', 'cat--stretch',
+    'cat--spin', 'cat--heart-eyes', 'cat--sleepy', 'cat--celebrate',
+    'cat--bounce', 'cat--idle',
+  ];
+
+  /* ============================================================
+     APP STATE (singleton)
+  ============================================================ */
+  const AppState = (() => {
+    const initial = () => ({
+      petCount: 0,
+      happinessValue: 0,
+      isMuted: false,
+      lastReactionIndex: -1,
+      isAnimating: false,
+    });
+
+    let state = initial();
+
+    return {
+      get petCount()         { return state.petCount; },
+      get happinessValue()   { return state.happinessValue; },
+      get isMuted()          { return state.isMuted; },
+      get lastReactionIndex(){ return state.lastReactionIndex; },
+      get isAnimating()      { return state.isAnimating; },
+      set isAnimating(v)     { state.isAnimating = v; },
+      set lastReactionIndex(v){ state.lastReactionIndex = v; },
+
+      pet() {
+        state.petCount        = Math.min(state.petCount + 1, 999_999);
+        state.happinessValue  = Math.min(state.happinessValue + 1, 100);
+        return { petCount: state.petCount, happinessValue: state.happinessValue };
+      },
+
+      toggleMute() {
+        state.isMuted = !state.isMuted;
+        return state.isMuted;
+      },
+
+      reset() {
+        state = initial();
+      },
+    };
+  })();
+
+  /* ============================================================
+     EVENT BUS
+  ============================================================ */
+  const EventBus = {
+    emit(name, detail = {}) {
+      document.dispatchEvent(new CustomEvent(name, { detail }));
+    },
+    on(name, handler) {
+      document.addEventListener(name, handler);
+    },
+  };
+
+  /* ============================================================
+     SOUND MANAGER (lazy AudioContext)
+  ============================================================ */
+  const SoundManager = (() => {
+    let audioContext = null;
+    let initialized = false;
+    const clips = new Map();
+    let muted = false;
+
+    // Tiny procedural sounds via Web Audio API (no external files needed)
+    // Each generator returns an AudioBuffer created with synthesis
+    const synthClips = {
+      purr: (ctx) => {
+        const dur = 0.6;
+        const buf = ctx.createBuffer(1, ctx.sampleRate * dur, ctx.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < data.length; i++) {
+          const t = i / ctx.sampleRate;
+          // Low rumble with harmonics — purr
+          data[i] = 0.25 * (
+            Math.sin(2 * Math.PI * 30 * t) * Math.sin(2 * Math.PI * 8 * t) +
+            Math.sin(2 * Math.PI * 60 * t) * 0.3
+          ) * Math.exp(-t * 1.5);
+        }
+        return buf;
+      },
+      tilt: (ctx) => {
+        const dur = 0.35;
+        const buf = ctx.createBuffer(1, ctx.sampleRate * dur, ctx.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < data.length; i++) {
+          const t = i / ctx.sampleRate;
+          data[i] = 0.3 * Math.sin(2 * Math.PI * (500 + 300 * t) * t) * Math.exp(-t * 4);
+        }
+        return buf;
+      },
+      blink: (ctx) => {
+        const dur = 0.2;
+        const buf = ctx.createBuffer(1, ctx.sampleRate * dur, ctx.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < data.length; i++) {
+          const t = i / ctx.sampleRate;
+          data[i] = 0.4 * Math.sin(2 * Math.PI * 800 * t) * Math.exp(-t * 20);
+        }
+        return buf;
+      },
+      stretch: (ctx) => {
+        const dur = 0.5;
+        const buf = ctx.createBuffer(1, ctx.sampleRate * dur, ctx.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < data.length; i++) {
+          const t = i / ctx.sampleRate;
+          data[i] = 0.2 * (
+            Math.sin(2 * Math.PI * (200 - 100 * t) * t) +
+            (Math.random() * 2 - 1) * 0.08
+          ) * Math.exp(-t * 2);
+        }
+        return buf;
+      },
+      spin: (ctx) => {
+        const dur = 0.4;
+        const buf = ctx.createBuffer(1, ctx.sampleRate * dur, ctx.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < data.length; i++) {
+          const t = i / ctx.sampleRate;
+          data[i] = 0.3 * Math.sin(2 * Math.PI * (300 + 600 * t) * t) * Math.exp(-t * 3);
+        }
+        return buf;
+      },
+      heartEyes: (ctx) => {
+        const dur = 0.5;
+        const buf = ctx.createBuffer(1, ctx.sampleRate * dur, ctx.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < data.length; i++) {
+          const t = i / ctx.sampleRate;
+          data[i] = 0.25 * (
+            Math.sin(2 * Math.PI * 600 * t) +
+            Math.sin(2 * Math.PI * 900 * t) * 0.5
+          ) * Math.exp(-t * 4);
+        }
+        return buf;
+      },
+      sleepy: (ctx) => {
+        const dur = 0.7;
+        const buf = ctx.createBuffer(1, ctx.sampleRate * dur, ctx.sampleRate);
+        const data = buf.getChannelData(0);
+        for (let i = 0; i < data.length; i++) {
+          const t = i / ctx.sampleRate;
+          data[i] = 0.2 * Math.sin(2 * Math.PI * (200 - 80 * t) * t) * Math.exp(-t * 2);
+        }
+        return buf;
+      },
+      celebrate: (ctx) => {
+        const dur = 1.0;
+        const buf = ctx.createBuffer(1, ctx.sampleRate * dur, ctx.sampleRate);
+        const data = buf.getChannelData(0);
+        const notes = [523, 659, 784, 1047];
+        for (let i = 0; i < data.length; i++) {
+          const t = i / ctx.sampleRate;
+          const noteIdx = Math.floor(t / (dur / notes.length));
+          const freq = notes[Math.min(noteIdx, notes.length - 1)];
+          const tNote = t % (dur / notes.length);
+          data[i] = 0.25 * Math.sin(2 * Math.PI * freq * t) * Math.exp(-tNote * 8);
+        }
+        return buf;
+      },
+    };
+
+    async function init() {
+      if (initialized) return;
+      initialized = true;
+      try {
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        // Pre-generate synthesized clips
+        for (const [id, gen] of Object.entries(synthClips)) {
+          try {
+            const buffer = gen(audioContext);
+            clips.set(id, buffer);
+          } catch (e) {
+            console.warn(`[SoundManager] Failed to synthesize clip "${id}":`, e);
+          }
+        }
+      } catch (e) {
+        console.warn('[SoundManager] AudioContext init failed:', e);
+      }
+    }
+
+    function play(id) {
+      if (muted) return;
+      if (!audioContext) return;
+      const buffer = clips.get(id);
+      if (!buffer) return;
+      try {
+        const source = audioContext.createBufferSource();
+        source.buffer = buffer;
+        source.connect(audioContext.destination);
+        source.start(0);
+      } catch (e) {
+        console.warn(`[SoundManager] Failed to play clip "${id}":`, e);
+      }
+    }
+
+    function setMuted(value) {
+      muted = !!value;
+    }
+
+    return { init, play, setMuted, get isMuted() { return muted; } };
+  })();
+
+  /* ============================================================
+     UI RENDERER
+  ============================================================ */
+  const UIRenderer = (() => {
+    const progressBar     = document.getElementById('progress-bar');
+    const happinessValue  = document.getElementById('happiness-value');
+    const petCountEl      = document.getElementById('pet-count');
+    const muteBtn         = document.getElementById('mute-btn');
+    const meterEl         = document.getElementById('happiness-meter');
+
+    function updateHappinessMeter(v) {
+      const pct = Math.max(0, Math.min(100, Math.round(v)));
+      progressBar.style.width      = `${pct}%`;
+      happinessValue.textContent   = `${pct}`;
+      meterEl.setAttribute('aria-valuenow', pct);
+    }
+
+    function updatePetCounter(v) {
+      petCountEl.textContent = v.toLocaleString();
+    }
+
+    function setMuteButtonState(isMuted) {
+      muteBtn.textContent = isMuted ? '🔇' : '🔊';
+      muteBtn.setAttribute('aria-pressed', String(isMuted));
+      muteBtn.setAttribute('aria-label', isMuted ? 'Unmute sound' : 'Mute sound');
+      muteBtn.title = isMuted ? 'Unmute' : 'Mute';
+    }
+
+    return { updateHappinessMeter, updatePetCounter, setMuteButtonState };
+  })();
+
+  /* ============================================================
+     ANIMATION ENGINE
+  ============================================================ */
+  const AnimationEngine = (() => {
+    const catEl    = document.getElementById('cat');
+    const stageEl  = document.getElementById('cat-stage');
+    let   idleTimeout = null;
+    let   reactionTimeout = null;
+    let   labelCount = 0;  // for unique offsets
+
+    // Pick next reaction avoiding repeat
+    function selectNextReaction(lastIndex) {
+      if (reactionPool.length === 0)  return -1;
+      if (reactionPool.length === 1)  return 0;
+      const candidates = reactionPool
+        .map((_, i) => i)
+        .filter(i => i !== lastIndex);
+      return candidates[Math.floor(Math.random() * candidates.length)];
+    }
+
+    function removeAllReactionClasses() {
+      catEl.classList.remove(...ALL_CAT_REACTION_CLASSES);
+    }
+
+    function stopCurrentAnimation() {
+      clearTimeout(reactionTimeout);
+      clearTimeout(idleTimeout);
+      removeAllReactionClasses();
+    }
+
+    function returnToIdle(delay = 50) {
+      idleTimeout = setTimeout(() => {
+        removeAllReactionClasses();
+        catEl.classList.add('cat--idle');
+        AppState.isAnimating = false;
+      }, delay);
+    }
+
+    function getCatCenter() {
+      const rect = catEl.getBoundingClientRect();
+      const stageRect = stageEl.getBoundingClientRect();
+      return {
+        x: rect.left + rect.width  / 2 - stageRect.left,
+        y: rect.top  + rect.height / 2 - stageRect.top,
+      };
+    }
+
+    function spawnFloatingLabel(label, cx, cy, offsetX = 0, offsetY = 0) {
+      const el = document.createElement('span');
+      el.className = 'floating-label';
+      el.setAttribute('aria-hidden', 'true');
+      el.textContent = label;
+
+      // Clamp initial position within 80px of center
+      const maxOff = 60;
+      const ox = Math.max(-maxOff, Math.min(maxOff, offsetX));
+      const oy = Math.max(-maxOff, Math.min(maxOff, offsetY));
+
+      el.style.left    = `${cx + ox - 16}px`;
+      el.style.top     = `${cy + oy - 16}px`;
+
+      // Randomize duration 800–1200ms
+      const dur = 800 + Math.random() * 400;
+      el.style.animationDuration = `${dur}ms`;
+
+      stageEl.appendChild(el);
+
+      // Remove on animationend with setTimeout fallback
+      const cleanup = () => {
+        if (el.parentNode) el.parentNode.removeChild(el);
+      };
+      el.addEventListener('animationend', cleanup, { once: true });
+      setTimeout(cleanup, dur + 250);
+    }
+
+    function spawnBurst(reaction, centerX, centerY) {
+      // Main reaction label
+      spawnFloatingLabel(reaction.label, centerX, centerY, 0, -20);
+
+      // One or more emoji particles with spatial spread
+      const spread = [
+        { ox: -35, oy: -10 },
+        { ox:  35, oy: -10 },
+        { ox:   0, oy:  30 },
+      ];
+
+      const count = 1 + Math.floor(Math.random() * 2); // 1–2 extra particles
+      for (let i = 0; i < count; i++) {
+        const off = spread[i % spread.length];
+        spawnFloatingLabel(reaction.emoji, centerX, centerY,
+          off.ox + (Math.random() * 14 - 7),
+          off.oy + (Math.random() * 14 - 7)
+        );
+      }
+    }
+
+    function triggerCelebrationFlash() {
+      const flash = document.getElementById('celebrate-flash');
+      flash.classList.add('active');
+      // Spawn extra confetti
+      const { x, y } = getCatCenter();
+      const confetti = ['🎉','🌟','✨','🎊','💫','⭐','🎈'];
+      for (let i = 0; i < 6; i++) {
+        const emoji = confetti[Math.floor(Math.random() * confetti.length)];
+        const ox = (Math.random() - 0.5) * 120;
+        const oy = (Math.random() - 0.5) * 80;
+        setTimeout(() => {
+          spawnFloatingLabel(emoji, x, y, ox, oy);
+        }, i * 80);
+      }
+      setTimeout(() => flash.classList.remove('active'), 400);
+    }
+
+    function playReaction(reactionIndex, isCelebration = false) {
+      // Stop any in-progress animation
+      stopCurrentAnimation();
+      AppState.isAnimating = true;
+
+      const reaction = isCelebration
+        ? celebrationReaction
+        : reactionPool[reactionIndex];
+
+      if (!reaction) {
+        returnToIdle();
+        return;
+      }
+
+      // 1. Apply bounce synchronously (same tick) — Req 3.5
+      catEl.classList.add('cat--bounce');
+
+      // 2. After bounce completes (250ms), apply reaction animation
+      setTimeout(() => {
+        catEl.classList.remove('cat--bounce');
+        catEl.classList.add(reaction.cssClass);
+      }, 250);
+
+      // 3. Spawn floating labels
+      const { x, y } = getCatCenter();
+      spawnBurst(reaction, x, y);
+
+      if (isCelebration) {
+        triggerCelebrationFlash();
+      }
+
+      // 4. Return to idle after reaction duration
+      reactionTimeout = setTimeout(() => {
+        returnToIdle(50);
+      }, reaction.durationMs + 250);
+    }
+
+    // Start idle on load
+    function startIdle() {
+      removeAllReactionClasses();
+      catEl.classList.add('cat--idle');
+    }
+
+    return { selectNextReaction, playReaction, stopCurrentAnimation, startIdle };
+  })();
+
+  /* ============================================================
+     WIRING — EventBus petAction handler
+  ============================================================ */
+  let soundInitialized = false;
+  let prevHappiness = 0;
+
+  EventBus.on('petAction', async () => {
+    // Guard: empty pool
+    if (reactionPool.length === 0) return;
+
+    // 1. Init sound on first action (lazy)
+    if (!soundInitialized) {
+      soundInitialized = true;
+      await SoundManager.init();
+    }
+
+    // 2. Update state
+    prevHappiness = AppState.happinessValue;
+    const { petCount, happinessValue } = AppState.pet();
+
+    // 3. Check for celebration milestone
+    const crossedMilestone = (
+      happinessValue > 0 &&
+      happinessValue % 10 === 0 &&
+      prevHappiness % 10 !== 0
+    );
+
+    // 4. Select reaction
+    const nextIndex = AnimationEngine.selectNextReaction(AppState.lastReactionIndex);
+    AppState.lastReactionIndex = nextIndex;
+
+    // 5. Play animation
+    AnimationEngine.playReaction(nextIndex, crossedMilestone);
+
+    // 6. Play sound
+    if (crossedMilestone) {
+      SoundManager.play('celebrate');
+    } else if (nextIndex >= 0) {
+      SoundManager.play(reactionPool[nextIndex].soundId);
+    }
+
+    // 7. Update UI
+    UIRenderer.updateHappinessMeter(happinessValue);
+    UIRenderer.updatePetCounter(petCount);
+  });
+
+  /* ============================================================
+     CAT CLICK / KEYBOARD HANDLERS
+  ============================================================ */
+  const catEl = document.getElementById('cat');
+
+  catEl.addEventListener('click', () => {
+    EventBus.emit('petAction');
+  });
+
+  catEl.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault(); // prevent page scroll on Space
+      EventBus.emit('petAction');
+    }
+  });
+
+  /* ============================================================
+     MUTE BUTTON
+  ============================================================ */
+  const muteBtn = document.getElementById('mute-btn');
+
+  muteBtn.addEventListener('click', () => {
+    const newMuted = AppState.toggleMute();
+    SoundManager.setMuted(newMuted);
+    UIRenderer.setMuteButtonState(newMuted);
+  });
+
+  /* ============================================================
+     INIT
+  ============================================================ */
+  document.addEventListener('DOMContentLoaded', () => {
+    AnimationEngine.startIdle();
+    UIRenderer.updateHappinessMeter(0);
+    UIRenderer.updatePetCounter(0);
+    UIRenderer.setMuteButtonState(false);
+  });
+
+  // Fallback if DOMContentLoaded already fired
+  if (document.readyState === 'interactive' || document.readyState === 'complete') {
+    AnimationEngine.startIdle();
+  }
+  </script>
+</body>
+</html>
